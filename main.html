@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Line Tool</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font for a clean look */
+        body {
+            font-family: "Inter", sans-serif;
+        }
+        /* Basic canvas styling */
+        canvas {
+            border: 1px solid #ccc;
+            background-color: #f9fafb; /* Light gray background for canvas */
+            display: block;
+            margin: 0 auto;
+            border-radius: 0.5rem; /* Rounded corners for canvas */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center py-8">
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg w-11/12 max-w-4xl">
+        <!-- Input and Buttons -->
+        <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4 mb-6">
+            <input type="number" id="numberInput" placeholder="Enter an integer (e.g., -5, 34, -120)"
+                   class="p-3 border border-gray-300 rounded-lg w-full md:w-auto focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="drawButton"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full md:w-auto">
+                Place on Line
+            </button>
+            <button id="resetButton"
+                    class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 w-full md:w-auto">
+                Reset
+            </button>
+        </div>
+
+        <!-- Canvas for Number Line -->
+        <div class="relative mb-6">
+            <canvas id="numberLineCanvas" class="w-full"></canvas>
+            <div id="messageBox" class="absolute inset-x-0 bottom-full bg-red-100 text-red-700 p-2 rounded-md mb-2 hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        // Get canvas and context
+        const canvas = document.getElementById('numberLineCanvas');
+        const ctx = canvas.getContext('2d');
+        const numberInput = document.getElementById('numberInput');
+        const drawButton = document.getElementById('drawButton');
+        const resetButton = document.getElementById('resetButton');
+        const messageBox = document.getElementById('messageBox');
+
+        // Initial number line range (can be adjusted dynamically)
+        let minVal = -10;
+        let maxVal = 10;
+        let markerValue = null; // Stores the number to be marked
+
+        // Function to show a message in the message box
+        function showMessage(message, isError = false) {
+            messageBox.textContent = message;
+            messageBox.className = `absolute inset-x-0 bottom-full p-2 rounded-md mb-2 ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000); // Hide after 3 seconds
+        }
+
+        // Function to draw the number line
+        function drawNumberLine() {
+            // Adjust canvas size for responsiveness
+            const containerWidth = canvas.parentElement.clientWidth;
+            canvas.width = containerWidth > 800 ? 800 : containerWidth * 0.95; // Max 800px or 95% of parent
+            canvas.height = 100; // Fixed height
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const lineLength = canvas.width * 0.8; // 80% of canvas width
+            const startX = centerX - lineLength / 2;
+            const endX = centerX + lineLength / 2;
+
+            // Calculate scale (pixels per unit)
+            const scale = lineLength / (maxVal - minVal);
+
+            // Draw the main line
+            ctx.beginPath();
+            ctx.moveTo(startX, centerY);
+            ctx.lineTo(endX, centerY);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw arrowheads
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.moveTo(endX, centerY);
+            ctx.lineTo(endX - 8, centerY - 5);
+            ctx.lineTo(endX - 8, centerY + 5);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(startX, centerY);
+            ctx.lineTo(startX + 8, centerY - 5);
+            ctx.lineTo(startX + 8, centerY + 5);
+            ctx.fill();
+
+            // Draw tick marks and numbers
+            ctx.font = '14px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            // Determine tick interval based on range
+            let tickInterval = 1;
+            if (maxVal - minVal > 50) {
+                tickInterval = 10;
+            } else if (maxVal - minVal > 20) {
+                tickInterval = 5;
+            }
+
+            for (let i = minVal; i <= maxVal; i++) {
+                if (i % tickInterval === 0 || i === 0) { // Draw ticks for every interval or for 0
+                    const x = startX + (i - minVal) * scale;
+                    ctx.beginPath();
+                    ctx.moveTo(x, centerY - 5);
+                    ctx.lineTo(x, centerY + 5);
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Label the numbers
+                    ctx.fillStyle = '#333';
+                    ctx.fillText(i, x, centerY + 10);
+                }
+            }
+
+            // Highlight Zero
+            const zeroX = startX + (0 - minVal) * scale;
+            ctx.fillStyle = '#000'; // Black for zero
+            ctx.fillText('0', zeroX, centerY + 10); // Redraw 0 to ensure it's black
+
+            // Draw the marker if a value is set
+            if (markerValue !== null) {
+                const markerX = startX + (markerValue - minVal) * scale;
+                ctx.beginPath();
+                ctx.arc(markerX, centerY, 8, 0, Math.PI * 2); // Draw a circle marker
+                ctx.fillStyle = markerValue >= 0 ? '#10B981' : '#EF4444'; // Green for positive, Red for negative
+                ctx.fill();
+                ctx.strokeStyle = '#fff'; // White border for marker
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Label the marker value
+                ctx.fillStyle = markerValue >= 0 ? '#10B981' : '#EF4444';
+                ctx.font = 'bold 16px "Inter", sans-serif';
+                ctx.fillText(markerValue, markerX, centerY - 25);
+            }
+        }
+
+        // Event listener for the "Place on Line" button
+        drawButton.addEventListener('click', () => {
+            const inputValue = numberInput.value;
+            const number = parseInt(inputValue);
+
+            if (isNaN(number)) {
+                showMessage("Please enter a valid whole number.", true);
+                return;
+            }
+
+            markerValue = number; // Set the value to be marked
+
+            // Dynamically adjust the range of the number line
+            const absNumber = Math.abs(number);
+            if (absNumber > 10) { // If input is outside default -10 to 10 range
+                let newMax = Math.ceil(absNumber * 1.5 / 10) * 10; // Scale up to nearest 10 or 100
+                if (newMax < 20) newMax = 20; // Minimum expanded range
+                minVal = -newMax;
+                maxVal = newMax;
+            } else {
+                minVal = -10; // Default range
+                maxVal = 10;
+            }
+
+            // Ensure 0 is always within visible ticks if the range is small
+            if (minVal > 0 && number < 0) minVal = -5; // Make sure negative side is visible if marker is negative
+            if (maxVal < 0 && number > 0) maxVal = 5; // Make sure positive side is visible if marker is positive
+
+            drawNumberLine();
+            showMessage(`Number ${number} placed on the line!`);
+        });
+
+        // Event listener for the "Reset" button
+        resetButton.addEventListener('click', () => {
+            minVal = -10;
+            maxVal = 10;
+            markerValue = null;
+            numberInput.value = '';
+            drawNumberLine();
+            showMessage("Number line reset.");
+        });
+
+        // Initial draw when the page loads
+        window.onload = function() {
+            drawNumberLine();
+            // Add event listener for window resize to make canvas responsive
+            window.addEventListener('resize', drawNumberLine);
+        };
+    </script>
+</body>
+</html>
